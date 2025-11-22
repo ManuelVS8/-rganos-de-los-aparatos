@@ -101,11 +101,17 @@
   @media (max-width: 899px) { .school-logo { width: 140px; max-width: 160px; } }
   @media (max-width: 420px) { .school-logo { width: 110px; max-width: 40%; margin-top: 0.6rem; } .results { gap: 0.4rem; padding: 0 0.6rem; } }
   
-  /* Confetti Corregido y Disperso */
-  .confetti{ position:fixed; width:10px; height:10px; border-radius:50%; animation: confetti-fall 3s linear forwards; z-index:999; }
+  /* Confetti Corregido (Con animación y variables para dispersión) */
+  .confetti{ 
+    position:fixed; 
+    width:10px; height:10px; border-radius:50%; 
+    animation: confetti-fall var(--duration) linear forwards; 
+    z-index:999; 
+    animation-delay: var(--delay);
+  }
   @keyframes confetti-fall{ 
-    0%{ transform:translate(0, -20px) rotate(0); opacity:1;} 
-    100%{ transform:translate(var(--tx), var(--ty)) rotate(360deg); opacity:0; } 
+    0%{ transform:translateY(0) rotate(0deg); opacity:1;} /* Empieza sin offset vertical */
+    100%{ transform:translate(var(--x-end), var(--y-end)) rotate(720deg); opacity:0; } /* Cae con offset X y termina debajo de la pantalla */
   }
 
   .loading-indicator {
@@ -122,7 +128,7 @@
   @media (min-width:900px){ .board{ grid-template-columns: 360px 1fr; } .panel{ order:1; } .stage{ order:2; } }
   @media (max-width:899px){ header{ margin-top:1.6rem; } .board{ grid-template-columns:1fr; } .panel{ display:flex; flex-direction:row; align-items:center; justify-content:space-between; padding:.6rem; } .word-display-container{ order:0; width:100%; margin-bottom:.6rem; } .stage{ order:1; } }
 
-  /* la Fama */
+  /* Hall de la Fama */
   .hall-of-fame { width: 100%; max-width: 800px; margin: 1rem auto; background: var(--panel); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
   .hall-of-fame-title { text-align: center; color: var(--blue-700); font-size: 1.2rem; font-weight: 800; margin-bottom: 0.8rem; }
   .hall-of-fame-table { width: 100%; border-collapse: collapse; }
@@ -244,7 +250,7 @@
 
 <script>
 // --- CONFIGURACIÓN ---
-// URL ya corregida con tu dirección correcta
+const SHEET_NAME = "Aparatos"; 
 const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzwPDxbGmyC9WuNjaLuDgDSgrt74hMkyYTcAxyLoJ6qlI-TBmsV6W1ml5AXKC3TyMA8CQ/exec";
 
 // Datos del juego
@@ -285,9 +291,6 @@ const el = (id) => document.getElementById(id);
 
 // --- FUNCIONES DE RED (Hall of Fame) ---
 
-/**
- * Carga y muestra el la Fama desde Google Sheets
- */
 async function loadHallOfFame() {
   const container = el('hallOfFameContent');
   
@@ -297,10 +300,11 @@ async function loadHallOfFame() {
   }
 
   try {
-    const uniqueUrl = APP_SCRIPT_URL + "?v=" + Date.now();
+    const uniqueUrl = APP_SCRIPT_URL + `?sheetName=${SHEET_NAME}&v=` + Date.now();
+
     container.innerHTML = '<div class="hall-of-fame-loading">Cargando...</div>';
 
-    const res = await fetch(uniqueUrl); // GET por defecto
+    const res = await fetch(uniqueUrl); 
     const json = await res.json();
     
     if (json.success && json.data && json.data.length > 0) {
@@ -347,10 +351,10 @@ async function loadHallOfFame() {
 
 async function submitScore(name, surname, time, score) {
   const loading = el('loadingIndicator');
-  loading.style.display = 'flex'; // Mostrar spinner
+  loading.style.display = 'flex'; 
   
   try {
-    const payload = { name, surname, time, score };
+    const payload = { name, surname, time, score, sheetName: SHEET_NAME }; 
     
     const res = await fetch(APP_SCRIPT_URL, {
       method: 'POST',
@@ -433,7 +437,6 @@ function beginPlay(){
   showOrgan();
 }
 
-// FUNCIÓN CORREGIDA
 function showOrgan() {
   el('wordDisplay').textContent = ORGANS_DATA[organsOrder[currentOrganIndex]].name;
 }
@@ -488,7 +491,6 @@ function finishGame(){
     play('completed'); 
   }
   
-  // Llamamos al modal incondicionalmente
   showSubmitModal(finalTimeValue, score); 
 }
 
@@ -496,7 +498,6 @@ function showSubmitModal(time, score) {
   el('submitModal').style.display = 'block';
   el('modalTime').textContent = formatMixedTime(time);
   
-  // Recrear botones para limpiar eventos
   const subBtn = el('submitScoreBtn'), discBtn = el('discardScoreBtn');
   const newSub = subBtn.cloneNode(true), newDisc = discBtn.cloneNode(true);
   subBtn.replaceWith(newSub); discBtn.replaceWith(newDisc);
@@ -544,21 +545,36 @@ el('muteBtn').addEventListener('click', ()=>{ isMuted=!isMuted; el('muteBtn').te
 window.addEventListener('resize', placeMarkers);
 
 // INIT
-// Esta línea ahora se ejecutará correctamente para ocultar el indicador de carga.
 el('loadingIndicator').style.display = 'none'; 
 setTimeout(loadHallOfFame, 100);
 
-// Confetti con dispersión mejorada
+// Función de Confeti Corregida para caída aleatoria y dispersa
 function spawnConfetti(){
-  for(let i=0;i<60;i++){
+  const numConfetti = 80; 
+  for(let i=0;i<numConfetti;i++){
     const c=document.createElement('div'); c.className='confetti';
-    c.style.left=Math.random()*window.innerWidth+'px'; c.style.top='-10px';
+    
+    // 1. Posición inicial aleatoria en X y ligeramente fuera de la pantalla en Y
+    const startX = Math.random() * window.innerWidth;
+    c.style.left = startX + 'px'; 
+    c.style.top = (Math.random() * -50) + 'px'; 
+
     c.style.backgroundColor=`hsl(${Math.random()*360},70%,50%)`;
-    // '--tx' crea un movimiento horizontal disperso
-    c.style.setProperty('--tx',(Math.random()-.5)*200+'px'); 
-    // '--ty' asegura que cae por debajo de la pantalla
-    c.style.setProperty('--ty',(window.innerHeight+20)+'px'); 
-    document.body.appendChild(c); setTimeout(()=>c.remove(),3000);
+    
+    // 2. Duración y Retraso aleatorios para que caigan a destiempo
+    c.style.setProperty('--duration', (Math.random() * 2 + 2) + 's'); // 2s a 4s
+    c.style.setProperty('--delay', (Math.random() * 1) + 's'); // 0s a 1s de retraso
+
+    // 3. Offset X aleatorio (movimiento horizontal lateral)
+    const xOffset = (Math.random() - 0.5) * 300; // -150px a +150px
+    c.style.setProperty('--x-end', xOffset + 'px'); 
+    
+    // 4. Offset Y final
+    const yEnd = window.innerHeight + 100;
+    c.style.setProperty('--y-end', yEnd + 'px'); 
+    
+    document.body.appendChild(c); 
+    setTimeout(()=>c.remove(), 5000); 
   }
 }
 </script>
